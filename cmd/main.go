@@ -30,10 +30,22 @@ func init() {
 	if err := godotenv.Load(); err != nil {
 		log.Fatalf("Error reading config file %s", err)
 	}
-	config_figpath := os.Getenv("krakend_config_path")
-	viper.SetConfigFile(config_figpath)
+	config_path := os.Getenv("krakend_config_path")
+	viper.SetConfigFile(config_path)
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error reading config file, %s", err)
+	}
+	extra := make(map[string]string)
+	extra["http_target"] = os.Getenv("http_target")
+
+	epoints := viper.Get("endpoints").([]interface{})
+	if len(epoints) == 0 {
+		epoints = append(epoints, utility.BuildFormPostConfig(extra)...)
+		epoints = append(epoints, utility.BuildFormGetConfig(extra)...)
+		epoints = append(epoints, utility.BuildDataGetConfig(extra)...)
+		epoints = append(epoints, utility.BuildSearchConfig(extra)...)
+		viper.Set("endpoints", epoints)
+		viper.WriteConfig()
 	}
 
 }
@@ -44,7 +56,7 @@ func main() {
 	router.HandleFunc("/form", ConfigHandler).Methods("POST")
 	router.HandleFunc("/api/table/{name}", DataPostHandler).Methods("POST")
 	router.HandleFunc("/api/query", DataGetHandler).Methods("POST")
-	router.HandleFunc("/api/table/search", SearchHandler).Methods("GET")
+	router.HandleFunc("/api/search/{table}", SearchHandler).Methods("GET")
 	log.Fatal(http.ListenAndServe(":3000", router))
 }
 
@@ -57,11 +69,7 @@ func BuildKrakendConfig(config map[string]interface{}) error {
 	extra_config["http_target"] = http_target
 
 	//add series of endpoints required
-	endpoints = append(endpoints, utility.BuildFormGetConfig(config, extra_config)...)
 	endpoints = append(endpoints, utility.BuildDataPostConfig(config, extra_config)...)
-	endpoints = append(endpoints, utility.BuildDataGetConfig(config, extra_config)...)
-	endpoints = append(endpoints, utility.BuildUpdateConfig(config, extra_config)...)
-
 	// for _, v := range endpoints {
 	// 	// fmt.Println(v.(map[string]interface{})["endpoint"])
 	// }
@@ -133,6 +141,7 @@ func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&request)
 
 	query := request["query"].(string)
+	fmt.Println("Above query : ", query)
 
 	var response response.QueryResponse
 	response.Status = "query successfully"
@@ -184,5 +193,65 @@ func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func SearchHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("inside search handler")
+	parameters := make(map[string]string)
+	for k, v := range r.URL.Query() {
+		parameters[k] = v[0]
+	}
+	params := mux.Vars(r)
+	parameters["table"] = params["table"]
+
+	query := utility.ConvertParamsToQuery(parameters)
+
+	fmt.Println("QUERY : ", query)
+
+	var response response.QueryResponse
+	response.Status = "query successfully"
+	response.Results = []map[string]interface{}{}
+	statusCode := http.StatusOK
+
+	collection, postfixQuery, err := parser.ParseQuery(query)
+	fmt.Println("collection : ", collection)
+	if err != nil {
+		response.Status = "query unsuccessfully"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+
+	resultArray, err := eng.SearchDocument(collection, postfixQuery)
+	if err != nil {
+		response.Status = "query unsuccessfully"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+
+	result := make([]map[string]interface{}, 0)
+
+	for _, v := range resultArray {
+		var resultInBytes = make(map[string][]byte)
+
+		err := json.Unmarshal(v, &resultInBytes)
+		delete(resultInBytes, "_indices")
+		if err != nil {
+			response.Status = "query unsuccessfully"
+			statusCode = http.StatusBadRequest
+			encoding.JsonEncode(w, response, statusCode)
+			return
+		}
+		eachResult := make(map[string]interface{})
+		for key, val := range resultInBytes {
+			var eachValue interface{}
+			json.Unmarshal(val, &eachValue)
+			eachResult[key] = eachValue
+		}
+		result = append(result, eachResult)
+	}
+
+	response.Results = result
+	encoding.JsonEncode(w, response, statusCode)
+	return
+
 	return
 }
