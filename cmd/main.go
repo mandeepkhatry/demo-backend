@@ -46,6 +46,7 @@ func init() {
 		epoints = append(epoints, utility.BuildFormGetConfig(extra)...)
 		epoints = append(epoints, utility.BuildDataGetConfig(extra)...)
 		epoints = append(epoints, utility.BuildSearchConfig(extra)...)
+		epoints = append(epoints, utility.BuildUpdateConfig(extra)...)
 		viper.Set("endpoints", epoints)
 		viper.WriteConfig()
 	}
@@ -57,9 +58,10 @@ func main() {
 	log.Println("-----------------Starting router----------------")
 	router.HandleFunc("/form", ConfigHandler).Methods("POST")
 	router.HandleFunc("/form/{table}", ConfigGetHandler).Methods("GET")
-	router.HandleFunc("/api/table/{name}", DataPostHandler).Methods("POST")
+	router.HandleFunc("/api/table/{table}", DataPostHandler).Methods("POST")
 	router.HandleFunc("/api/query", DataGetHandler).Methods("POST")
 	router.HandleFunc("/api/search/{table}", SearchHandler).Methods("GET")
+	router.HandleFunc("/api/update/{table}/{_id}", UpdateHandler).Methods("POST")
 	log.Fatal(http.ListenAndServe(":3000", router))
 }
 
@@ -201,7 +203,7 @@ func DataPostHandler(w http.ResponseWriter, r *http.Request) {
 		indices = append(indices, k)
 	}
 
-	err := eng.InsertDocument(params["name"], data, indices)
+	err := eng.InsertDocument(params["table"], data, indices)
 
 	if err != nil {
 		response.Status = "data added unsuccessfully"
@@ -365,6 +367,51 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Results = result
+	encoding.JsonEncode(w, response, statusCode)
+	return
+
+}
+
+func UpdateHandler(w http.ResponseWriter, r *http.Request) {
+
+	var request map[string]interface{}
+	json.NewDecoder(r.Body).Decode(&request)
+	params := mux.Vars(r)
+	data := make(map[string][]byte)
+	indices := make([]string, 0)
+	var response response.DataResponse
+	response.Status = "data updated successfully"
+	statusCode := http.StatusOK
+
+	for k, v := range request {
+		valueInBytes, err := json.Marshal(v)
+		if err != nil {
+			response.Status = "data updated unsuccessfully"
+			statusCode = http.StatusBadRequest
+			encoding.JsonEncode(w, response, statusCode)
+			return
+		}
+		data[k] = valueInBytes
+		indices = append(indices, k)
+	}
+
+	id, err := strconv.Atoi(params["_id"])
+	fmt.Println("id : ", id)
+	if err != nil {
+		response.Status = "data updated unsuccessfully"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+	err = eng.UpdateDocument(params["table"], data, id)
+
+	if err != nil {
+		response.Status = "data updated unsuccessfully"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+
 	encoding.JsonEncode(w, response, statusCode)
 	return
 

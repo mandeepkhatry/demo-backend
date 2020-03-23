@@ -119,13 +119,13 @@ func BuildDataPostConfig(config map[string]interface{}, extra map[string]string)
 	return endpoint
 }
 
-func BuildUpdateConfig(config map[string]interface{}, extra map[string]string) []interface{} {
+func BuildUpdateConfig(extra map[string]string) []interface{} {
 	krakendConfig := make(map[string]interface{})
 	extraConfig := make(map[string]interface{})
 	backendConfig := make(map[string]interface{})
 	endpoint := make([]interface{}, 0)
 
-	krakendConfig["endpoint"] = "/api/" + config["table"].(string) + "/{id}"
+	krakendConfig["endpoint"] = "/api/update/{table}/{_id}"
 	krakendConfig["method"] = "POST"
 	krakendConfig["output_encoding"] = "no-op"
 
@@ -133,7 +133,7 @@ func BuildUpdateConfig(config map[string]interface{}, extra map[string]string) [
 
 	krakendConfig["extra_config"] = extraConfig
 
-	backendConfig["url_pattern"] = "/data/{id}"
+	backendConfig["url_pattern"] = "/api/update/{table}/{_id}"
 	backendConfig["host"] = []string{extra["http_target"]}
 
 	krakendConfig["backend"] = []map[string]interface{}{backendConfig}

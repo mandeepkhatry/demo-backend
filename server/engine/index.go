@@ -42,7 +42,7 @@ func (e *Engine) IndexSingleDocument(collectionID []byte, uniqueID []byte, data 
 func (e *Engine) IndexDocument(collectionID []byte,
 	uniqueID []byte, data map[string][]byte, indices []string) ([][]byte, [][]byte, error) {
 
-	typeOfData, newData := findTypeOfData(data)
+	typeOfData, newData := FindTypeOfData(data)
 	/*
 		typeOfData:
 		map['name']='string'

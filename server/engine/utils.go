@@ -142,7 +142,7 @@ func checkIfInt(data float64) bool {
 }
 
 //FindTypeOfData returns type of data with keys as data field and value as type and type specific data bytes
-func findTypeOfData(data map[string][]byte) (map[string]string, map[string][]byte) {
+func FindTypeOfData(data map[string][]byte) (map[string]string, map[string][]byte) {
 
 	//typeOfData represents a map with key that represents data field and value that represents type of data
 	typeOfData := make(map[string]string)
