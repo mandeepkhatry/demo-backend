@@ -368,15 +368,125 @@ func (e *Engine) SearchIdentifiers(dbname string, collection string,
 	return dbID, collectionID, namespaceID, nil
 }
 
+func (e *Engine) InsertSingleIndexDocument(collection string, data map[string][]byte, index string, typeOfData string) error {
+
+	if len(e.DBName) == 0 || len(collection) == 0 || len(e.Namespace) == 0 {
+		return def.NamesCannotBeEmpty
+	}
+
+	//KV pair to insert in batch
+	keyCache := make([][]byte, 0)
+	valueCache := make([][]byte, 0)
+
+	if _, ok := e.Session[e.DBName]; !ok {
+		return def.DbDoesNotExist
+	}
+
+	if _, ok := e.Session[e.Namespace]; !ok {
+		return def.NamespaceDoesNotExist
+	}
+
+	collectionID, err := e.GetCollectionIdentifier([]byte(collection))
+
+	if err != nil {
+		return err
+	}
+
+	//generate unique_id
+	uniqueID, err := e.GenerateUniqueID(collectionID)
+	if err != nil {
+		return err
+	}
+
+	// indexer
+	indexKey, indexValue, err := e.IndexSingleDocument(collectionID, uniqueID, data, index, typeOfData)
+	if err != nil {
+		return err
+	}
+
+	keyCache = append(keyCache, indexKey...)
+	valueCache = append(valueCache, indexValue...)
+
+	key := []byte(string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID) + ":" + string(uniqueID))
+
+	dataInBytes, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	keyCache = append(keyCache, key)
+	valueCache = append(valueCache, dataInBytes)
+
+	//insert in batch
+	err = e.Store.PutBatch(keyCache, valueCache)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (e *Engine) SearchSingleDocument(collection string,
+	index string, typeOfData string) ([][]byte, error) {
+
+	if len(e.DBName) == 0 || len(collection) == 0 || len(e.Namespace) == 0 {
+		return [][]byte{}, def.NamesCannotBeEmpty
+	}
+
+	if _, ok := e.Session[e.DBName]; !ok {
+		return [][]byte{}, def.DbDoesNotExist
+	}
+
+	if _, ok := e.Session[e.Namespace]; !ok {
+		return [][]byte{}, def.NamespaceDoesNotExist
+	}
+
+	//here if collection doesn't exist, do not create new one
+	collectionID, err := e.Store.Get([]byte(def.MetaCollection + collection))
+	if err != nil {
+		return [][]byte{}, err
+	}
+
+	//collectionID check is required here
+	if len(e.DBID) == 0 || len(collectionID) == 0 || len(e.DBID) == 0 {
+		return [][]byte{}, def.IdentifierNotFound
+	}
+
+	indexKey := []byte(def.IndexKey + string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID) + ":" + index + ":" + typeOfData)
+
+	valuesInByte, err := e.Store.Get(indexKey)
+	if err != nil {
+		return [][]byte{}, err
+	}
+
+	rb := roaring.New()
+	err = rb.UnmarshalBinary(valuesInByte)
+	if err != nil {
+		return [][]byte{}, err
+	}
+
+	uniqueIDByte := make([]byte, 4)
+
+	binary.BigEndian.PutUint32(uniqueIDByte, rb.ToArray()[0])
+
+	searchKeys := make([][]byte, 0)
+	documentKeys := []byte(string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID) + ":" + string(uniqueIDByte))
+	searchKeys = append(searchKeys, documentKeys)
+
+	resultArr, err := e.Store.GetBatch(searchKeys)
+	if err != nil {
+		return [][]byte{}, err
+	}
+	return resultArr, nil
+}
+
 //InsertDocument retrieves identifiers and inserts document to database
 func (e *Engine) InsertDocument(collection string,
 	data map[string][]byte, indices []string) error {
 
-	fmt.Println("HERE")
 	if len(e.DBName) == 0 || len(collection) == 0 || len(e.Namespace) == 0 {
 		return def.NamesCannotBeEmpty
 	}
-	fmt.Println("HERE")
 
 	//KV pair to insert in batch
 	keyCache := make([][]byte, 0)

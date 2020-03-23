@@ -10,6 +10,34 @@ import (
 )
 
 //TODO: verify
+
+func (e *Engine) IndexSingleDocument(collectionID []byte, uniqueID []byte, data map[string][]byte, index string, typeOfData string) ([][]byte, [][]byte, error) {
+
+	//convert uniqueID into uint32
+	num := binary.BigEndian.Uint32(uniqueID)
+	//fmt.Println("[[index.go]]uniqueID in int32:", num)
+	arrKeys := make([][]byte, 0)
+	arrValues := make([][]byte, 0)
+
+	fieldToIndex := strings.Replace(index, " ", "", -1)
+
+	indexKey := []byte(def.IndexKey + string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID) + ":" + fieldToIndex + ":" + typeOfData)
+
+	arrKeys = append(arrKeys, indexKey)
+
+	indexRB := roaring.BitmapOf(num)
+	marshaledRB, err := indexRB.MarshalBinary()
+	if err != nil {
+		return [][]byte{}, [][]byte{}, err
+	}
+
+	arrValues = append(arrValues, marshaledRB)
+
+	//fmt.Println("[[index.go]]arrKeys:", arrKeys)
+	//fmt.Println("[[index.go]]arrValues:", arrValues)
+	return arrKeys, arrValues, nil
+}
+
 //IndexDocument indexes document in batch
 func (e *Engine) IndexDocument(collectionID []byte,
 	uniqueID []byte, data map[string][]byte, indices []string) ([][]byte, [][]byte, error) {

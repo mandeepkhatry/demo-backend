@@ -30,7 +30,8 @@ func init() {
 	if err := godotenv.Load(); err != nil {
 		log.Fatalf("Error reading config file %s", err)
 	}
-	config_path := os.Getenv("krakend_config_path")
+	config_path := os.Getenv("krakend_config_path") + "/config.json"
+
 	viper.SetConfigFile(config_path)
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error reading config file, %s", err)
@@ -54,6 +55,7 @@ func main() {
 	router := mux.NewRouter()
 	log.Println("-----------------Starting router----------------")
 	router.HandleFunc("/form", ConfigHandler).Methods("POST")
+	router.HandleFunc("/form/{table}", ConfigGetHandler).Methods("GET")
 	router.HandleFunc("/api/table/{name}", DataPostHandler).Methods("POST")
 	router.HandleFunc("/api/query", DataGetHandler).Methods("POST")
 	router.HandleFunc("/api/search/{table}", SearchHandler).Methods("GET")
@@ -84,16 +86,93 @@ func BuildKrakendConfig(config map[string]interface{}) error {
 func ConfigHandler(w http.ResponseWriter, r *http.Request) {
 	var config map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&config)
-	err := BuildKrakendConfig(config)
 	var response response.FormResponse
 	response.Status = "config added successfully"
 	statusCode := http.StatusOK
+
+	for _, v := range viper.Get("endpoints").([]interface{}) {
+		if v.(map[string]interface{})["endpoint"].(string) == "/api/table/"+config["table"].(string) {
+			response.Status = "config added previously"
+			encoding.JsonEncode(w, response, statusCode)
+			return
+		}
+	}
+
+	err := BuildKrakendConfig(config)
+
 	if err != nil {
 		response.Status = "config added unsuccessfully"
 		statusCode = http.StatusBadRequest
 		encoding.JsonEncode(w, response, statusCode)
 		return
 	}
+
+	data := make(map[string][]byte)
+
+	for k, v := range config {
+		valueInBytes, err := json.Marshal(v)
+		if err != nil {
+			response.Status = "data added unsuccessfully"
+			statusCode = http.StatusBadRequest
+			encoding.JsonEncode(w, response, statusCode)
+			return
+		}
+		data[k] = valueInBytes
+	}
+	fmt.Println("CONFIG : ", config)
+	docIndex := "bank_" + config["table"].(string) + "_schema"
+	fmt.Println(docIndex)
+	err = eng.InsertSingleIndexDocument(config["table"].(string), data, docIndex, "document")
+	if err != nil {
+		response.Status = "config added unsuccessfully"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+	encoding.JsonEncode(w, response, statusCode)
+	return
+}
+
+func ConfigGetHandler(w http.ResponseWriter, r *http.Request) {
+	parameters := mux.Vars(r)
+	fmt.Println("PARMATERS : ", parameters)
+	var response response.QueryResponse
+	response.Status = "schema fetched successfully"
+	response.Results = []map[string]interface{}{}
+	statusCode := http.StatusOK
+
+	docIndex := "bank_" + parameters["table"] + "_schema"
+
+	resultArray, err := eng.SearchSingleDocument(parameters["table"], docIndex, "document")
+	if err != nil {
+		fmt.Println("here")
+		response.Status = "schema fetched unsuccessfully"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+	result := make([]map[string]interface{}, 0)
+
+	for _, v := range resultArray {
+		var resultInBytes = make(map[string][]byte)
+
+		err := json.Unmarshal(v, &resultInBytes)
+		if err != nil {
+			response.Status = "schema fetched unsuccessfully"
+			statusCode = http.StatusBadRequest
+			encoding.JsonEncode(w, response, statusCode)
+			return
+		}
+		eachResult := make(map[string]interface{})
+		for key, val := range resultInBytes {
+			var eachValue interface{}
+			json.Unmarshal(val, &eachValue)
+			eachResult[key] = eachValue
+		}
+		result = append(result, eachResult)
+	}
+
+	response.Results = result
 	encoding.JsonEncode(w, response, statusCode)
 	return
 
@@ -253,5 +332,4 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	encoding.JsonEncode(w, response, statusCode)
 	return
 
-	return
 }

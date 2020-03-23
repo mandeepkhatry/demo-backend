@@ -33,10 +33,9 @@ func BuildFormGetConfig(extra map[string]string) []interface{} {
 	krakendConfig["method"] = "GET"
 	krakendConfig["output_encoding"] = "no-op"
 
-	extraConfig["decoding"] = "json"
 	krakendConfig["extra_config"] = extraConfig
 
-	backendConfig["url_pattern"] = "/form"
+	backendConfig["url_pattern"] = "/form/{table}"
 	backendConfig["host"] = []string{extra["http_target"]}
 
 	krakendConfig["backend"] = []map[string]interface{}{backendConfig}
@@ -102,7 +101,7 @@ func BuildDataPostConfig(config map[string]interface{}, extra map[string]string)
 	backendConfig := make(map[string]interface{})
 	endpoint := make([]interface{}, 0)
 
-	krakendConfig["endpoint"] = "/api/" + "table" + "/" + "{name}"
+	krakendConfig["endpoint"] = "/api/" + "table" + "/" + config["table"].(string)
 	krakendConfig["method"] = "POST"
 	krakendConfig["output_encoding"] = "no-op"
 
