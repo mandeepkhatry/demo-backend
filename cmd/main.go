@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -135,7 +136,6 @@ func ConfigHandler(w http.ResponseWriter, r *http.Request) {
 
 func ConfigGetHandler(w http.ResponseWriter, r *http.Request) {
 	parameters := mux.Vars(r)
-	fmt.Println("PARMATERS : ", parameters)
 	var response response.QueryResponse
 	response.Status = "schema fetched successfully"
 	response.Results = []map[string]interface{}{}
@@ -220,7 +220,6 @@ func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&request)
 
 	query := request["query"].(string)
-	fmt.Println("Above query : ", query)
 
 	var response response.QueryResponse
 	response.Status = "query successfully"
@@ -272,22 +271,59 @@ func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func SearchHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("inside search handler")
-	parameters := make(map[string]string)
-	for k, v := range r.URL.Query() {
-		parameters[k] = v[0]
-	}
 	params := mux.Vars(r)
-	parameters["table"] = params["table"]
-
-	query := utility.ConvertParamsToQuery(parameters)
-
-	fmt.Println("QUERY : ", query)
-
 	var response response.QueryResponse
 	response.Status = "query successfully"
 	response.Results = []map[string]interface{}{}
 	statusCode := http.StatusOK
+
+	parameters := make(map[string]string)
+	parameters["table"] = params["table"]
+
+	for k, v := range r.URL.Query() {
+		parameters[k] = v[0]
+	}
+	fmt.Println(parameters["_id"])
+
+	if val, ok := parameters["_id"]; ok {
+		id, err := strconv.Atoi(val)
+
+		if len(parameters) > 2 || err != nil {
+			response.Status = "conflicting query"
+			statusCode = http.StatusBadRequest
+			encoding.JsonEncode(w, response, statusCode)
+			return
+		}
+
+		resultArray, err := eng.SearchDocumentById(parameters["table"], id)
+		if err != nil {
+			response.Status = "query unsuccessful"
+			statusCode = http.StatusBadRequest
+			encoding.JsonEncode(w, response, statusCode)
+			return
+		}
+		var resultInBytes = make(map[string][]byte)
+
+		err = json.Unmarshal(resultArray, &resultInBytes)
+		delete(resultInBytes, "_indices")
+		if err != nil {
+			response.Status = "query unsuccessfully"
+			statusCode = http.StatusBadRequest
+			encoding.JsonEncode(w, response, statusCode)
+			return
+		}
+		eachResult := make(map[string]interface{})
+		for key, val := range resultInBytes {
+			var eachValue interface{}
+			json.Unmarshal(val, &eachValue)
+			eachResult[key] = eachValue
+		}
+		response.Results = append(response.Results, eachResult)
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+
+	query := utility.ConvertParamsToQuery(parameters)
 
 	collection, postfixQuery, err := parser.ParseQuery(query)
 	fmt.Println("collection : ", collection)

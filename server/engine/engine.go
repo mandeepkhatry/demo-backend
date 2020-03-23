@@ -426,6 +426,30 @@ func (e *Engine) InsertSingleIndexDocument(collection string, data map[string][]
 	return nil
 }
 
+func (e *Engine) SearchDocumentById(collection string, id int) ([]byte, error) {
+	if len(e.DBName) == 0 || len(collection) == 0 || len(e.Namespace) == 0 {
+		return []byte{}, def.NamesCannotBeEmpty
+	}
+
+	if _, ok := e.Session[e.DBName]; !ok {
+		return []byte{}, def.DbDoesNotExist
+	}
+
+	if _, ok := e.Session[e.Namespace]; !ok {
+		return []byte{}, def.NamespaceDoesNotExist
+	}
+	//here if collection doesn't exist, do not create new one
+	collectionID, err := e.Store.Get([]byte(def.MetaCollection + collection))
+	if err != nil {
+		return []byte{}, err
+	}
+
+	uniqueIDByte := make([]byte, 4)
+	binary.BigEndian.PutUint32(uniqueIDByte, uint32(id))
+	documentKeys := []byte(string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID) + ":" + string(uniqueIDByte))
+	return e.Store.Get(documentKeys)
+}
+
 func (e *Engine) SearchSingleDocument(collection string,
 	index string, typeOfData string) ([][]byte, error) {
 
@@ -512,6 +536,8 @@ func (e *Engine) InsertDocument(collection string,
 		return err
 	}
 
+	currentCount := int(binary.BigEndian.Uint32(uniqueID))
+
 	// indexer
 	indexKey, indexValue, err := e.IndexDocument(collectionID, uniqueID, data, indices)
 	if err != nil {
@@ -525,6 +551,8 @@ func (e *Engine) InsertDocument(collection string,
 
 	indicesBytes, _ := json.Marshal(indices)
 	data["_indices"] = indicesBytes
+	idBytes, _ := json.Marshal(currentCount)
+	data["_id"] = idBytes
 	dataInBytes, err := json.Marshal(data)
 	if err != nil {
 		return err
