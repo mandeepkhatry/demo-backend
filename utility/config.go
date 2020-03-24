@@ -78,7 +78,7 @@ func BuildSearchConfig(extra map[string]string) []interface{} {
 	backendConfig := make(map[string]interface{})
 	extraConfig := make(map[string]interface{})
 	endpoint := make([]interface{}, 0)
-	krakendConfig["endpoint"] = "/api/search/{table}"
+	krakendConfig["endpoint"] = "/api/table/{table}"
 	krakendConfig["querystring_params"] = []string{"*"}
 	krakendConfig["method"] = "GET"
 	krakendConfig["output_encoding"] = "no-op"
@@ -125,15 +125,37 @@ func BuildUpdateConfig(extra map[string]string) []interface{} {
 	backendConfig := make(map[string]interface{})
 	endpoint := make([]interface{}, 0)
 
-	krakendConfig["endpoint"] = "/api/update/{table}/{_id}"
-	krakendConfig["method"] = "POST"
+	krakendConfig["endpoint"] = "/api/table/{table}/{_id}"
+	krakendConfig["method"] = "PATCH"
 	krakendConfig["output_encoding"] = "no-op"
 
 	extraConfig["decoding"] = "json"
 
 	krakendConfig["extra_config"] = extraConfig
 
-	backendConfig["url_pattern"] = "/api/update/{table}/{_id}"
+	backendConfig["url_pattern"] = krakendConfig["endpoint"]
+	backendConfig["host"] = []string{extra["http_target"]}
+
+	krakendConfig["backend"] = []map[string]interface{}{backendConfig}
+
+	endpoint = append(endpoint, krakendConfig)
+
+	return endpoint
+}
+
+func BuildDeleteConfig(extra map[string]string) []interface{} {
+	krakendConfig := make(map[string]interface{})
+	extraConfig := make(map[string]interface{})
+	backendConfig := make(map[string]interface{})
+	endpoint := make([]interface{}, 0)
+
+	krakendConfig["endpoint"] = "/api/table/{table}/{_id}"
+	krakendConfig["method"] = "DELETE"
+	krakendConfig["output_encoding"] = "no-op"
+
+	krakendConfig["extra_config"] = extraConfig
+
+	backendConfig["url_pattern"] = krakendConfig["endpoint"]
 	backendConfig["host"] = []string{extra["http_target"]}
 
 	krakendConfig["backend"] = []map[string]interface{}{backendConfig}

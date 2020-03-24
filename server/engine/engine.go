@@ -741,3 +741,69 @@ func (e *Engine) UpdateDocument(collection string, data map[string][]byte, id in
 	return e.Store.Put(documentKey, docBytes)
 
 }
+
+//Delete deletes documents matching with given query params
+func (e *Engine) DeleteDocument(collection string,
+	id int) error {
+	if len(e.DBName) == 0 || len(collection) == 0 || len(e.Namespace) == 0 {
+		return def.NamesCannotBeEmpty
+	}
+	//here if collection doesn't exist, do not create new one
+	collectionID, err := e.Store.Get([]byte(def.MetaCollection + collection))
+	if err != nil {
+		return err
+	}
+	//collectionID check is required here
+	if len(collectionID) == 0 {
+		return def.CollectionIdentifierEmpty
+	}
+
+	uniqueIDByte := make([]byte, 4)
+	binary.BigEndian.PutUint32(uniqueIDByte, uint32(id))
+
+	documentKey := []byte(string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID) + ":" + string(uniqueIDByte))
+
+	resultArray, err := e.Store.Get(documentKey)
+	if err != nil {
+		return err
+	}
+
+	var resultInBytes = make(map[string][]byte)
+
+	err = json.Unmarshal(resultArray, &resultInBytes)
+	if err != nil {
+		return err
+	}
+
+	indicesInterface := make([]string, 0)
+	err = json.Unmarshal(resultInBytes["_indices"], &indicesInterface)
+	if err != nil {
+		return err
+	}
+
+	delete(resultInBytes, "_indices")
+	typeOfData, newData := FindTypeOfData(resultInBytes)
+
+	for _, val := range indicesInterface {
+		eachIndex := []byte(def.IndexKey + string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID) + ":" + val + ":" + typeOfData[val] + ":" + string(newData[val]))
+		result, _ := e.Store.Get(eachIndex)
+		documentRb := roaring.New()
+		err = documentRb.UnmarshalBinary(result)
+		if err != nil {
+			return err
+		}
+
+		documentRb.Remove(uint32(id))
+
+		marshaledRB, err := documentRb.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		err = e.Store.Put(eachIndex, marshaledRB)
+		if err != nil {
+			return err
+		}
+
+	}
+	return e.Store.DeleteKey(documentKey)
+}

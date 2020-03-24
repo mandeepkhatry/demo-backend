@@ -47,6 +47,7 @@ func init() {
 		epoints = append(epoints, utility.BuildDataGetConfig(extra)...)
 		epoints = append(epoints, utility.BuildSearchConfig(extra)...)
 		epoints = append(epoints, utility.BuildUpdateConfig(extra)...)
+		epoints = append(epoints, utility.BuildDeleteConfig(extra)...)
 		viper.Set("endpoints", epoints)
 		viper.WriteConfig()
 	}
@@ -59,9 +60,10 @@ func main() {
 	router.HandleFunc("/form", ConfigHandler).Methods("POST")
 	router.HandleFunc("/form/{table}", ConfigGetHandler).Methods("GET")
 	router.HandleFunc("/api/table/{table}", DataPostHandler).Methods("POST")
-	router.HandleFunc("/api/query", DataGetHandler).Methods("POST")
-	router.HandleFunc("/api/search/{table}", SearchHandler).Methods("GET")
-	router.HandleFunc("/api/update/{table}/{_id}", UpdateHandler).Methods("POST")
+	router.HandleFunc("/api/table/{table}", DataGetHandler).Methods("GET")
+	router.HandleFunc("/api/table/{table}/{_id}", UpdateHandler).Methods("PATCH")
+	router.HandleFunc("/api/table/{table}/{_id}", DeleteHandler).Methods("DELETE")
+	router.HandleFunc("/api/query", SearchHandler).Methods("POST")
 	log.Fatal(http.ListenAndServe(":3000", router))
 }
 
@@ -217,20 +219,20 @@ func DataPostHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func DataGetHandler(w http.ResponseWriter, r *http.Request) {
+func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	var request map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&request)
 
 	query := request["query"].(string)
 
 	var response response.QueryResponse
-	response.Status = "query successfully"
+	response.Status = "query successful"
 	response.Results = []map[string]interface{}{}
 	statusCode := http.StatusOK
 
 	collection, postfixQuery, err := parser.ParseQuery(query)
 	if err != nil {
-		response.Status = "query unsuccessfully"
+		response.Status = "query unsuccessful"
 		statusCode = http.StatusBadRequest
 		encoding.JsonEncode(w, response, statusCode)
 		return
@@ -238,7 +240,7 @@ func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	resultArray, err := eng.SearchDocument(collection, postfixQuery)
 	if err != nil {
-		response.Status = "query unsuccessfully"
+		response.Status = "query unsuccessful"
 		statusCode = http.StatusBadRequest
 		encoding.JsonEncode(w, response, statusCode)
 		return
@@ -252,7 +254,7 @@ func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 		err := json.Unmarshal(v, &resultInBytes)
 		delete(resultInBytes, "_indices")
 		if err != nil {
-			response.Status = "query unsuccessfully"
+			response.Status = "query unsuccessful"
 			statusCode = http.StatusBadRequest
 			encoding.JsonEncode(w, response, statusCode)
 			return
@@ -272,10 +274,11 @@ func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func SearchHandler(w http.ResponseWriter, r *http.Request) {
+func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
+	fmt.Println("params : ", params)
 	var response response.QueryResponse
-	response.Status = "query successfully"
+	response.Status = "query successful"
 	response.Results = []map[string]interface{}{}
 	statusCode := http.StatusOK
 
@@ -309,7 +312,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		err = json.Unmarshal(resultArray, &resultInBytes)
 		delete(resultInBytes, "_indices")
 		if err != nil {
-			response.Status = "query unsuccessfully"
+			response.Status = "query unsuccessful"
 			statusCode = http.StatusBadRequest
 			encoding.JsonEncode(w, response, statusCode)
 			return
@@ -326,11 +329,12 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := utility.ConvertParamsToQuery(parameters)
+	fmt.Println("QUERY :", query)
 
 	collection, postfixQuery, err := parser.ParseQuery(query)
 	fmt.Println("collection : ", collection)
 	if err != nil {
-		response.Status = "query unsuccessfully"
+		response.Status = "query unsuccessful"
 		statusCode = http.StatusBadRequest
 		encoding.JsonEncode(w, response, statusCode)
 		return
@@ -338,7 +342,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	resultArray, err := eng.SearchDocument(collection, postfixQuery)
 	if err != nil {
-		response.Status = "query unsuccessfully"
+		response.Status = "query unsuccessful"
 		statusCode = http.StatusBadRequest
 		encoding.JsonEncode(w, response, statusCode)
 		return
@@ -352,7 +356,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		err := json.Unmarshal(v, &resultInBytes)
 		delete(resultInBytes, "_indices")
 		if err != nil {
-			response.Status = "query unsuccessfully"
+			response.Status = "query unsuccessful"
 			statusCode = http.StatusBadRequest
 			encoding.JsonEncode(w, response, statusCode)
 			return
@@ -407,6 +411,36 @@ func UpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		response.Status = "data updated unsuccessfully"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+
+	encoding.JsonEncode(w, response, statusCode)
+	return
+
+}
+
+func DeleteHandler(w http.ResponseWriter, r *http.Request) {
+
+	params := mux.Vars(r)
+
+	var response response.DataResponse
+	response.Status = "data deleted successfully"
+	statusCode := http.StatusOK
+
+	id, err := strconv.Atoi(params["_id"])
+	fmt.Println("id : ", id)
+	if err != nil {
+		response.Status = "data deleted unsuccessfully"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+	err = eng.DeleteDocument(params["table"], id)
+
+	if err != nil {
+		response.Status = "data deleted unsuccessfully"
 		statusCode = http.StatusBadRequest
 		encoding.JsonEncode(w, response, statusCode)
 		return

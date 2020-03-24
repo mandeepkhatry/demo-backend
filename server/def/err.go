@@ -6,8 +6,6 @@ Package def defines constants, error messages and their status codes
 
 import (
 	"errors"
-
-	"google.golang.org/grpc/codes"
 )
 
 var (
@@ -29,18 +27,3 @@ var (
 	ConnectionCouldNotBeEstablished error = errors.New("connectionstore to database could not be established")
 	ResultsNotFound                 error = errors.New("results not found")
 )
-
-//define gRPC error status codes
-var ERRTYPE = map[error]codes.Code{
-	DbNameEmpty:               codes.InvalidArgument,
-	DbIdentifierEmpty:         codes.InvalidArgument,
-	CollectionNameEmpty:       codes.InvalidArgument,
-	CollectionIdentifierEmpty: codes.InvalidArgument,
-	NamespaceIdentifierEmpty:  codes.InvalidArgument,
-	NamesCannotBeEmpty:        codes.InvalidArgument,
-	KeyEmpty:                  codes.InvalidArgument,
-	EmptyKeyCannotBeDeleted:   codes.InvalidArgument,
-	StartKeyUnknown:           codes.InvalidArgument,
-	StartOrEndKeyEmpty:        codes.InvalidArgument,
-	IdentifierNotFound:        codes.NotFound,
-}
