@@ -294,11 +294,38 @@ func (s *StoreClient) ReverseScan(startKey []byte, endKey []byte, limit int) ([]
 
 }
 
+func (s *StoreClient) FetchAll(prefix []byte) ([][]byte, error) {
+	values := make([][]byte, 0)
+	err := s.DB.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			err := item.Value(func(v []byte) error {
+				values = append(values, v)
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+
+	})
+	if err != nil {
+		return [][]byte{}, err
+	}
+
+	return values, nil
+}
+
 //PrefixScan scans over [StartKey,endKey] for valid prefix upto limit
 //if limit is zero, it returns whole set of [startKey,endKey]
 func (s *StoreClient) PrefixScan(startKey []byte, prefix []byte, limit int) ([][]byte, [][]byte, error) {
+
 	keys := make([][]byte, 0)
 	values := make([][]byte, 0)
+
 	opts := badger.DefaultIteratorOptions
 	opts.Prefix = prefix
 

@@ -48,6 +48,8 @@ func init() {
 		epoints = append(epoints, utility.BuildSearchConfig(extra)...)
 		epoints = append(epoints, utility.BuildUpdateConfig(extra)...)
 		epoints = append(epoints, utility.BuildDeleteConfig(extra)...)
+		epoints = append(epoints, utility.BuildDataFetchConfig(extra)...)
+		epoints = append(epoints, utility.BuildFormsGetConfig(extra)...)
 		viper.Set("endpoints", epoints)
 		viper.WriteConfig()
 	}
@@ -58,9 +60,11 @@ func main() {
 	router := mux.NewRouter()
 	log.Println("-----------------Starting router----------------")
 	router.HandleFunc("/form", ConfigHandler).Methods("POST")
+	router.HandleFunc("/form", FormsGetHandler).Methods("GET")
 	router.HandleFunc("/form/{table}", ConfigGetHandler).Methods("GET")
 	router.HandleFunc("/api/table/{table}", DataPostHandler).Methods("POST")
 	router.HandleFunc("/api/table/{table}", DataGetHandler).Methods("GET")
+	router.HandleFunc("/api/table/{table}/{_id}", DataFetchHandler).Methods(("GET"))
 	router.HandleFunc("/api/table/{table}/{_id}", UpdateHandler).Methods("PATCH")
 	router.HandleFunc("/api/table/{table}/{_id}", DeleteHandler).Methods("DELETE")
 	router.HandleFunc("/api/query", SearchHandler).Methods("POST")
@@ -113,6 +117,7 @@ func ConfigHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := make(map[string][]byte)
+	form := make(map[string][]byte)
 
 	for k, v := range config {
 		valueInBytes, err := json.Marshal(v)
@@ -122,12 +127,26 @@ func ConfigHandler(w http.ResponseWriter, r *http.Request) {
 			encoding.JsonEncode(w, response, statusCode)
 			return
 		}
+		if k == "table" {
+			k = "_table"
+			form["_table"] = valueInBytes
+		} else if k == "schema" {
+			k = "_schema"
+		}
 		data[k] = valueInBytes
 	}
 	fmt.Println("CONFIG : ", config)
 	docIndex := "bank_" + config["table"].(string) + "_schema"
 	fmt.Println(docIndex)
 	err = eng.InsertSingleIndexDocument(config["table"].(string), data, docIndex, "document")
+	if err != nil {
+		response.Status = "config added unsuccessfully"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+
+	err = eng.InsertSingleIndexDocument("_form", form, "", "")
 	if err != nil {
 		response.Status = "config added unsuccessfully"
 		statusCode = http.StatusBadRequest
@@ -169,6 +188,11 @@ func ConfigGetHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		eachResult := make(map[string]interface{})
 		for key, val := range resultInBytes {
+			if key == "_table" {
+				key = "table"
+			} else if key == "_schema" {
+				key = "schema"
+			}
 			var eachValue interface{}
 			json.Unmarshal(val, &eachValue)
 			eachResult[key] = eachValue
@@ -230,7 +254,11 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	response.Results = []map[string]interface{}{}
 	statusCode := http.StatusOK
 
+	fmt.Println("QUERY : ", query)
+	fmt.Println("LENGTH QUERY : ", len(query))
+
 	collection, postfixQuery, err := parser.ParseQuery(query)
+	fmt.Println("COLLECTION : ", collection)
 	if err != nil {
 		response.Status = "query unsuccessful"
 		statusCode = http.StatusBadRequest
@@ -276,7 +304,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-	fmt.Println("params : ", params)
+
 	var response response.QueryResponse
 	response.Status = "query successful"
 	response.Results = []map[string]interface{}{}
@@ -285,92 +313,94 @@ func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 	parameters := make(map[string]string)
 	parameters["table"] = params["table"]
 
-	for k, v := range r.URL.Query() {
-		parameters[k] = v[0]
-	}
-	fmt.Println(parameters["_id"])
+	if len(r.URL.Query()) != 0 {
 
-	if val, ok := parameters["_id"]; ok {
-		id, err := strconv.Atoi(val)
-
-		if len(parameters) > 2 || err != nil {
-			response.Status = "conflicting query"
-			statusCode = http.StatusBadRequest
-			encoding.JsonEncode(w, response, statusCode)
-			return
+		for k, v := range r.URL.Query() {
+			parameters[k] = v[0]
 		}
+		fmt.Println("PARAMETERS NOW : ", parameters)
+		query := utility.ConvertParamsToQuery(parameters)
+		fmt.Println("QUERY : ", query)
+		fmt.Println("LENGTH QUERY : ", len(query))
 
-		resultArray, err := eng.SearchDocumentById(parameters["table"], id)
+		collection, postfixQuery, err := parser.ParseQuery(query)
+		fmt.Println("collection : ", collection)
 		if err != nil {
 			response.Status = "query unsuccessful"
 			statusCode = http.StatusBadRequest
 			encoding.JsonEncode(w, response, statusCode)
 			return
 		}
-		var resultInBytes = make(map[string][]byte)
 
-		err = json.Unmarshal(resultArray, &resultInBytes)
-		delete(resultInBytes, "_indices")
+		resultArray, err := eng.SearchDocument(collection, postfixQuery)
+		fmt.Println("RESULT ARRAY :", resultArray)
+		if err != nil {
+			fmt.Println("ERROR : ", err)
+			response.Status = "query unsuccessful"
+			statusCode = http.StatusBadRequest
+			encoding.JsonEncode(w, response, statusCode)
+			return
+		}
+
+		result := make([]map[string]interface{}, 0)
+
+		for _, v := range resultArray {
+			var resultInBytes = make(map[string][]byte)
+
+			err := json.Unmarshal(v, &resultInBytes)
+			delete(resultInBytes, "_indices")
+			if err != nil {
+				response.Status = "query unsuccessful"
+				statusCode = http.StatusBadRequest
+				encoding.JsonEncode(w, response, statusCode)
+				return
+			}
+			eachResult := make(map[string]interface{})
+			for key, val := range resultInBytes {
+				var eachValue interface{}
+				json.Unmarshal(val, &eachValue)
+				eachResult[key] = eachValue
+			}
+			result = append(result, eachResult)
+		}
+
+		response.Results = result
+
+	} else {
+		resultArray, err := eng.FetchAllDocuments(params["table"])
 		if err != nil {
 			response.Status = "query unsuccessful"
 			statusCode = http.StatusBadRequest
 			encoding.JsonEncode(w, response, statusCode)
 			return
 		}
-		eachResult := make(map[string]interface{})
-		for key, val := range resultInBytes {
-			var eachValue interface{}
-			json.Unmarshal(val, &eachValue)
-			eachResult[key] = eachValue
+		result := make([]map[string]interface{}, 0)
+
+		for _, v := range resultArray {
+			var resultInBytes = make(map[string][]byte)
+
+			err := json.Unmarshal(v, &resultInBytes)
+			delete(resultInBytes, "_indices")
+			if err != nil {
+				response.Status = "query unsuccessful"
+				statusCode = http.StatusBadRequest
+				encoding.JsonEncode(w, response, statusCode)
+				return
+			}
+			eachResult := make(map[string]interface{})
+			if _, schemaok := resultInBytes["_schema"]; !schemaok {
+				for key, val := range resultInBytes {
+					var eachValue interface{}
+					json.Unmarshal(val, &eachValue)
+					eachResult[key] = eachValue
+				}
+				result = append(result, eachResult)
+			}
 		}
-		response.Results = append(response.Results, eachResult)
-		encoding.JsonEncode(w, response, statusCode)
-		return
+
+		response.Results = result
 	}
 
-	query := utility.ConvertParamsToQuery(parameters)
-	fmt.Println("QUERY :", query)
-
-	collection, postfixQuery, err := parser.ParseQuery(query)
-	fmt.Println("collection : ", collection)
-	if err != nil {
-		response.Status = "query unsuccessful"
-		statusCode = http.StatusBadRequest
-		encoding.JsonEncode(w, response, statusCode)
-		return
-	}
-
-	resultArray, err := eng.SearchDocument(collection, postfixQuery)
-	if err != nil {
-		response.Status = "query unsuccessful"
-		statusCode = http.StatusBadRequest
-		encoding.JsonEncode(w, response, statusCode)
-		return
-	}
-
-	result := make([]map[string]interface{}, 0)
-
-	for _, v := range resultArray {
-		var resultInBytes = make(map[string][]byte)
-
-		err := json.Unmarshal(v, &resultInBytes)
-		delete(resultInBytes, "_indices")
-		if err != nil {
-			response.Status = "query unsuccessful"
-			statusCode = http.StatusBadRequest
-			encoding.JsonEncode(w, response, statusCode)
-			return
-		}
-		eachResult := make(map[string]interface{})
-		for key, val := range resultInBytes {
-			var eachValue interface{}
-			json.Unmarshal(val, &eachValue)
-			eachResult[key] = eachValue
-		}
-		result = append(result, eachResult)
-	}
-
-	response.Results = result
 	encoding.JsonEncode(w, response, statusCode)
 	return
 
@@ -446,6 +476,90 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	encoding.JsonEncode(w, response, statusCode)
+	return
+
+}
+
+func DataFetchHandler(w http.ResponseWriter, r *http.Request) {
+	var response response.QueryResponse
+	response.Status = "query successful"
+	response.Results = []map[string]interface{}{}
+	statusCode := http.StatusOK
+	params := mux.Vars(r)
+	id, err := strconv.Atoi(params["_id"])
+
+	if err != nil {
+		response.Status = "query unsuccessful"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+	resultArray, err := eng.SearchDocumentById(params["table"], id)
+	if err != nil {
+		response.Status = "query unsuccessful"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+	var resultInBytes = make(map[string][]byte)
+
+	err = json.Unmarshal(resultArray, &resultInBytes)
+	delete(resultInBytes, "_indices")
+	if err != nil {
+		response.Status = "query unsuccessful"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+	eachResult := make(map[string]interface{})
+	for key, val := range resultInBytes {
+		var eachValue interface{}
+		json.Unmarshal(val, &eachValue)
+		eachResult[key] = eachValue
+	}
+	response.Results = append(response.Results, eachResult)
+	encoding.JsonEncode(w, response, statusCode)
+	return
+
+}
+
+func FormsGetHandler(w http.ResponseWriter, r *http.Request) {
+
+	var response response.FormsResponse
+	result := make([]interface{}, 0)
+	response.Status = "forms fetched successfully"
+	response.Results = result
+	statusCode := http.StatusOK
+
+	resultArray, err := eng.SearchDocumentByPrefix("_form")
+	if err != nil {
+		fmt.Println("here")
+		response.Status = "schema fetched unsuccessfully"
+		statusCode = http.StatusBadRequest
+		encoding.JsonEncode(w, response, statusCode)
+		return
+	}
+
+	for _, v := range resultArray {
+		var resultInBytes = make(map[string][]byte)
+
+		err := json.Unmarshal(v, &resultInBytes)
+		if err != nil {
+			response.Status = "schema fetched unsuccessfully"
+			statusCode = http.StatusBadRequest
+			encoding.JsonEncode(w, response, statusCode)
+			return
+		}
+		for _, val := range resultInBytes {
+			var eachValue interface{}
+			json.Unmarshal(val, &eachValue)
+			result = append(result, eachValue)
+		}
+
+	}
+
+	response.Results = result
 	encoding.JsonEncode(w, response, statusCode)
 	return
 

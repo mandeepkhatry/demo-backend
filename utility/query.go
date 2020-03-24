@@ -17,7 +17,7 @@ func ConvertParamsToQuery(params map[string]string) string {
 		if valid.IsAlpha(v) {
 			eachParam = k + "=" + "\"" + v + "\""
 		} else {
-			eachParam = k + "=" + v + " "
+			eachParam = k + "=" + v
 		}
 		queryParams = append(queryParams, eachParam)
 	}

@@ -5,5 +5,5 @@ Package def defines constants, error messages and their status codes
 */
 
 const (
-	IntRange = 32768
+	IntRange = 2147483648
 )

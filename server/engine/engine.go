@@ -398,14 +398,17 @@ func (e *Engine) InsertSingleIndexDocument(collection string, data map[string][]
 		return err
 	}
 
-	// indexer
-	indexKey, indexValue, err := e.IndexSingleDocument(collectionID, uniqueID, data, index, typeOfData)
-	if err != nil {
-		return err
-	}
+	if len(index) >= 1 {
+		// indexer
+		indexKey, indexValue, err := e.IndexSingleDocument(collectionID, uniqueID, data, index, typeOfData)
+		if err != nil {
+			return err
+		}
 
-	keyCache = append(keyCache, indexKey...)
-	valueCache = append(valueCache, indexValue...)
+		keyCache = append(keyCache, indexKey...)
+		valueCache = append(valueCache, indexValue...)
+
+	}
 
 	key := []byte(string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID) + ":" + string(uniqueID))
 
@@ -539,13 +542,15 @@ func (e *Engine) InsertDocument(collection string,
 	currentCount := int(binary.BigEndian.Uint32(uniqueID))
 
 	// indexer
-	indexKey, indexValue, err := e.IndexDocument(collectionID, uniqueID, data, indices)
-	if err != nil {
-		return err
-	}
+	if len(indices) >= 1 {
+		indexKey, indexValue, err := e.IndexDocument(collectionID, uniqueID, data, indices)
+		if err != nil {
+			return err
+		}
 
-	keyCache = append(keyCache, indexKey...)
-	valueCache = append(valueCache, indexValue...)
+		keyCache = append(keyCache, indexKey...)
+		valueCache = append(valueCache, indexValue...)
+	}
 
 	key := []byte(string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID) + ":" + string(uniqueID))
 
@@ -568,6 +573,67 @@ func (e *Engine) InsertDocument(collection string,
 	}
 
 	return nil
+}
+
+func (e *Engine) FetchAllDocuments(collection string) ([][]byte, error) {
+	if len(e.DBName) == 0 || len(collection) == 0 || len(e.Namespace) == 0 {
+		return [][]byte{}, def.NamesCannotBeEmpty
+	}
+
+	if _, ok := e.Session[e.DBName]; !ok {
+		return [][]byte{}, def.DbDoesNotExist
+	}
+
+	if _, ok := e.Session[e.Namespace]; !ok {
+		return [][]byte{}, def.NamespaceDoesNotExist
+	}
+
+	//here if collection doesn't exist, do not create new one
+	collectionID, err := e.Store.Get([]byte(def.MetaCollection + collection))
+	if err != nil {
+		return [][]byte{}, err
+	}
+
+	//collectionID check is required here
+	if len(e.DBID) == 0 || len(collectionID) == 0 || len(e.DBID) == 0 {
+		return [][]byte{}, def.IdentifierNotFound
+	}
+
+	prefix := []byte(string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID))
+
+	return e.Store.FetchAll(prefix)
+
+}
+
+func (e *Engine) SearchDocumentByPrefix(collection string) ([][]byte, error) {
+	if len(e.DBName) == 0 || len(collection) == 0 || len(e.Namespace) == 0 {
+		return [][]byte{}, def.NamesCannotBeEmpty
+	}
+
+	if _, ok := e.Session[e.DBName]; !ok {
+		return [][]byte{}, def.DbDoesNotExist
+	}
+
+	if _, ok := e.Session[e.Namespace]; !ok {
+		return [][]byte{}, def.NamespaceDoesNotExist
+	}
+
+	//here if collection doesn't exist, do not create new one
+	collectionID, err := e.Store.Get([]byte(def.MetaCollection + collection))
+	if err != nil {
+		return [][]byte{}, err
+	}
+
+	//collectionID check is required here
+	if len(e.DBID) == 0 || len(collectionID) == 0 || len(e.DBID) == 0 {
+		return [][]byte{}, def.IdentifierNotFound
+	}
+	fmt.Println("INSIDE here :")
+
+	prefix := []byte(string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID))
+
+	return e.Store.FetchAll(prefix)
+
 }
 
 //SearchDocument queries document for given query params

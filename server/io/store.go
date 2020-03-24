@@ -15,6 +15,7 @@ type Store interface {
 	Get(key []byte) ([]byte, error)
 	//GetBatch retrieves values for given collection of keys in batch
 	GetBatch(keys [][]byte) ([][]byte, error)
+
 	//DeleteKey deletes given key from DB
 	DeleteKey(key []byte) error
 	//DeleteKeyRange deletes key,val pairs from startKey to endKey from DB
@@ -25,6 +26,7 @@ type Store interface {
 	//ReverseScan takes startKey,endKey and limit to scan in reverse direction [endKey,startKey]
 	//startKey can't be set to "" empty
 	ReverseScan(startKey []byte, endKey []byte, limit int) ([][]byte, [][]byte, error)
+	FetchAll(prefix []byte) ([][]byte, error)
 	//PrefixScan scans over [startKey,endKey] for valid prefix upto limit x
 	//if limit=0, full set [startKey,endKey] will be returned for valid prefix
 	PrefixScan(startKey []byte, prefix []byte, limit int) ([][]byte, [][]byte, error)
