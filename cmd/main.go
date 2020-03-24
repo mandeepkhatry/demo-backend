@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -304,24 +305,22 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-
+	fmt.Println("PARAMS : ", params)
 	var response response.QueryResponse
 	response.Status = "query successful"
 	response.Results = []map[string]interface{}{}
 	statusCode := http.StatusOK
 
 	parameters := make(map[string]string)
-	parameters["table"] = params["table"]
-
-	if len(r.URL.Query()) != 0 {
-
-		for k, v := range r.URL.Query() {
+	for k, v := range r.URL.Query() {
+		if len(strings.Trim(v[0], " ")) != 0 {
 			parameters[k] = v[0]
 		}
-		fmt.Println("PARAMETERS NOW : ", parameters)
+	}
+	if len(parameters) != 0 {
+		parameters["table"] = params["table"]
+
 		query := utility.ConvertParamsToQuery(parameters)
-		fmt.Println("QUERY : ", query)
-		fmt.Println("LENGTH QUERY : ", len(query))
 
 		collection, postfixQuery, err := parser.ParseQuery(query)
 		fmt.Println("collection : ", collection)
@@ -399,6 +398,7 @@ func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		response.Results = result
+
 	}
 
 	encoding.JsonEncode(w, response, statusCode)
