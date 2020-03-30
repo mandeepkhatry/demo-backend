@@ -120,6 +120,48 @@
       "extra_config": {},
       "method": "GET",
       "output_encoding": "no-op"
+    },
+    {
+      "backend": [
+        {
+          "host": [
+            "localhost:3000"
+          ],
+          "url_pattern": "/api/table/hello"
+        }
+      ],
+      "endpoint": "/api/table/hello",
+      "extra_config": {
+        "decoding": "json",
+        "schema": {
+          "properties": {
+            "age": {
+              "description": "Age",
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "isEmployee": {
+              "description": "true or false",
+              "type": "boolean"
+            },
+            "name": {
+              "description": "name",
+              "maxLength": 100,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "age"
+          ],
+          "title": "Person",
+          "type": "object"
+        }
+      },
+      "method": "POST",
+      "output_encoding": "no-op"
     }
   ],
   "extra_config": {

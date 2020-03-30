@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
 
@@ -29,11 +28,14 @@ func init() {
 	eng.Store = store
 	eng.ConnectDB()
 
-	if err := godotenv.Load(); err != nil {
-		log.Fatalf("Error reading config file %s", err)
-	}
-	config_path := os.Getenv("config_path")
-	port = strings.Split(os.Getenv("http_target"), ":")[1]
+	// if err := godotenv.Load(); err != nil {
+	// 	log.Fatalf("Error reading config file %s", err)
+	// }
+	// config_path := os.Getenv("config_path")
+	// port = strings.Split(os.Getenv("http_target"), ":")[1]
+
+	config_path := "./gateway/config.json"
+	port = "3000"
 
 	viper.SetConfigFile(config_path)
 	if err := viper.ReadInConfig(); err != nil {
