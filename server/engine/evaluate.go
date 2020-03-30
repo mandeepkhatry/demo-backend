@@ -42,9 +42,6 @@ var arithmeticExecution = map[string]func(io.Store, string, string, []byte, []by
 		dbID []byte, namespaceID []byte, collectionID []byte, compositeIndexKey []byte, compositePrefix []byte) (roaring.Bitmap, error) {
 
 		rb := roaring.New()
-
-		fmt.Println("db,collection,namespace-->", dbID, collectionID, namespaceID)
-
 		indexKey := []byte{}
 		if len(compositeIndexKey) == 0 {
 			indexKey = []byte(def.IndexKey + string(dbID) + ":" + string(collectionID) + ":" + string(namespaceID) + ":" + fieldName + ":" + fieldType + ":" + string(byteOrderedValue))

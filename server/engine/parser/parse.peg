@@ -20,10 +20,9 @@
             return "",[]string{},err
         }
 
-      fmt.Println("parsed---> ",got.(Query))
       query:=got.(Query)
       pfx:=postfix.InfixToPostfix(query.Condition)
-      fmt.Println("postfix exp-->",pfx)
+
       return query.Collection,pfx,err
     }
 
@@ -49,7 +48,6 @@ PARSE <- query:QUERY EOF{
 
 
 QUERY <- "@"collectionName:GETCOLLECTION _ condition:GETCONDITION{
-    fmt.Println("[[QUERY]] conditions:-->",condition)
     return Query{
         Collection: collectionName.(string),
         Condition: condition.([]string),
@@ -94,7 +92,6 @@ SelectCondition <- token:(LEFT_PARENTHESIS_TOKEN / AND_OPERATOR / OR_OPERATOR / 
         case string:
             conditionStr=v 
     }
-    fmt.Println("[[SelectCondition]]:",conditionStr)
     return conditionStr,nil 
 }
 
@@ -148,8 +145,7 @@ RetrieveFieldRest <- f:RetrieveFieldVal _ {
 }
 
 PARSECOMPOSITECONDITION <- _ "\u007B" _ comp:SelectCompositeCondition _ compx:SelectCompositeConditionRest* _ "\u007D"{
-    fmt.Println("comp:",comp)
-    fmt.Println("compx:",compx)
+
     compositeCond:=comp.(string)
     for _,v:=range compx.([]interface{}){
         compositeCond+=","+v.(string)

@@ -3,7 +3,6 @@ package engine
 import (
 	"demo-backend/server/def"
 	"encoding/binary"
-	"fmt"
 	"strings"
 
 	"github.com/RoaringBitmap/roaring"
@@ -54,7 +53,6 @@ func (e *Engine) IndexDocument(collectionID []byte,
 		map['age']=sorted int []byte
 		map['weight']=sorted double []byte
 	*/
-	fmt.Println("TYPE OF DATA is ", typeOfData)
 	//convert uniqueID into uint32
 	num := binary.BigEndian.Uint32(uniqueID)
 	//fmt.Println("[[index.go]]uniqueID in int32:", num)
@@ -76,7 +74,6 @@ func (e *Engine) IndexDocument(collectionID []byte,
 
 			//generate index key
 			indexKey := []byte(def.IndexKey + string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID) + ":" + fieldToIndex + ":" + typeOfData[fieldToIndex] + ":" + string(fieldValue))
-			fmt.Println("NEW INDEXKEY : ", indexKey)
 
 			//get value for that index key
 			val, err := e.Store.Get(indexKey)

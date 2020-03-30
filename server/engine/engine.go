@@ -628,7 +628,6 @@ func (e *Engine) SearchDocumentByPrefix(collection string) ([][]byte, error) {
 	if len(e.DBID) == 0 || len(collectionID) == 0 || len(e.DBID) == 0 {
 		return [][]byte{}, def.IdentifierNotFound
 	}
-	fmt.Println("INSIDE here :")
 
 	prefix := []byte(string(e.DBID) + ":" + string(collectionID) + ":" + string(e.NamespaceID))
 
@@ -672,8 +671,6 @@ func (e *Engine) SearchDocument(collection string,
 	resultRoaring := rb.(roaring.Bitmap)
 
 	//retrieve document keys for search
-	fmt.Println("result roaring size -->", resultRoaring.GetSerializedSizeInBytes())
-	fmt.Println("length of roaring -->", len(resultRoaring.ToArray()))
 	searchKeys := make([][]byte, 0)
 	searchKeyLength := len(resultRoaring.ToArray())
 	uniqueIDArr := resultRoaring.ToArray() //get all IDs

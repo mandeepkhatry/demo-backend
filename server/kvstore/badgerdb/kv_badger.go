@@ -3,7 +3,6 @@ package badgerdb
 import (
 	"bytes"
 	"demo-backend/server/def"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -49,8 +48,6 @@ func (s *StoreClient) CloseClient() error {
 
 //Put inserts key,val to badgerDB
 func (s *StoreClient) Put(key []byte, value []byte) error {
-	fmt.Println("[[Put]] key ", string(key))
-	fmt.Println("[[Put]] Value ", string(value))
 	if len(key) == 0 {
 		return def.KeyEmpty
 	}

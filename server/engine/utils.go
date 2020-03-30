@@ -155,7 +155,6 @@ func FindTypeOfData(data map[string][]byte) (map[string]string, map[string][]byt
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("[inteface data] : ", valueInterface)
 
 		dataType := fmt.Sprintf("%T", valueInterface)
 
@@ -177,7 +176,6 @@ func FindTypeOfData(data map[string][]byte) (map[string]string, map[string][]byt
 			newData[k] = marshal2.TypeMarshal("int", valueInterface)
 
 		} else if dataType == "string" {
-			fmt.Println("Value interface in string : ", valueInterface.(string))
 			layout, err := formatter.FormatConstantDate(valueInterface.(string))
 			if err != nil {
 				typeOfData[k] = def.ApplicationSpecificType["string"]
@@ -189,7 +187,6 @@ func FindTypeOfData(data map[string][]byte) (map[string]string, map[string][]byt
 				timeInterface = time
 				timeType := def.ApplicationSpecificType[fmt.Sprintf("%T", time)]
 				typeOfData[k] = timeType
-				fmt.Println("TIME TYPE IS : ", timeType)
 				newData[k] = marshal2.TypeMarshal("time.Time", timeInterface)
 			}
 

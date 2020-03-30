@@ -291,9 +291,9 @@ __Create a .env file in the same folder as this .zip is located__
 Copy and paste this on .env file
 ``` 
 http_target = localhost:3000
-krakend_config_path = /home/mandeep/work/src/krakend-gateway
+config_path = /home/mandeep/work/src/krakend-gateway/config.json
 
 ```
-Choose location whre ur config file is.
+Choose location where your config file is.
 
 __Run ./main__  

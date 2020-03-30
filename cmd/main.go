@@ -8,7 +8,6 @@ import (
 	"demo-backend/server/kvstore"
 	"demo-backend/utility"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -21,6 +20,7 @@ import (
 )
 
 var eng engine.Engine
+var port string
 
 func init() {
 	eng.DBName = "db"
@@ -32,7 +32,8 @@ func init() {
 	if err := godotenv.Load(); err != nil {
 		log.Fatalf("Error reading config file %s", err)
 	}
-	config_path := os.Getenv("krakend_config_path") + "/config.json"
+	config_path := os.Getenv("config_path")
+	port = strings.Split(os.Getenv("http_target"), ":")[1]
 
 	viper.SetConfigFile(config_path)
 	if err := viper.ReadInConfig(); err != nil {
@@ -69,7 +70,7 @@ func main() {
 	router.HandleFunc("/api/table/{table}/{_id}", UpdateHandler).Methods("PATCH")
 	router.HandleFunc("/api/table/{table}/{_id}", DeleteHandler).Methods("DELETE")
 	router.HandleFunc("/api/query", SearchHandler).Methods("POST")
-	log.Fatal(http.ListenAndServe(":3000", router))
+	log.Fatal(http.ListenAndServe(":"+port, router))
 }
 
 func BuildKrakendConfig(config map[string]interface{}) error {
@@ -136,9 +137,9 @@ func ConfigHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		data[k] = valueInBytes
 	}
-	fmt.Println("CONFIG : ", config)
+
 	docIndex := "bank_" + config["table"].(string) + "_schema"
-	fmt.Println(docIndex)
+
 	err = eng.InsertSingleIndexDocument(config["table"].(string), data, docIndex, "document")
 	if err != nil {
 		response.Status = "config added unsuccessfully"
@@ -169,7 +170,6 @@ func ConfigGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	resultArray, err := eng.SearchSingleDocument(parameters["table"], docIndex, "document")
 	if err != nil {
-		fmt.Println("here")
 		response.Status = "schema fetched unsuccessfully"
 		statusCode = http.StatusBadRequest
 		encoding.JsonEncode(w, response, statusCode)
@@ -218,7 +218,6 @@ func DataPostHandler(w http.ResponseWriter, r *http.Request) {
 	statusCode := http.StatusOK
 
 	for k, v := range request {
-		fmt.Println(k, v)
 		valueInBytes, err := json.Marshal(v)
 		if err != nil {
 			response.Status = "data added unsuccessfully"
@@ -255,11 +254,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	response.Results = []map[string]interface{}{}
 	statusCode := http.StatusOK
 
-	fmt.Println("QUERY : ", query)
-	fmt.Println("LENGTH QUERY : ", len(query))
-
 	collection, postfixQuery, err := parser.ParseQuery(query)
-	fmt.Println("COLLECTION : ", collection)
 	if err != nil {
 		response.Status = "query unsuccessful"
 		statusCode = http.StatusBadRequest
@@ -305,7 +300,6 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-	fmt.Println("PARAMS : ", params)
 	var response response.QueryResponse
 	response.Status = "query successful"
 	response.Results = []map[string]interface{}{}
@@ -323,7 +317,6 @@ func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 		query := utility.ConvertParamsToQuery(parameters)
 
 		collection, postfixQuery, err := parser.ParseQuery(query)
-		fmt.Println("collection : ", collection)
 		if err != nil {
 			response.Status = "query unsuccessful"
 			statusCode = http.StatusBadRequest
@@ -332,9 +325,7 @@ func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		resultArray, err := eng.SearchDocument(collection, postfixQuery)
-		fmt.Println("RESULT ARRAY :", resultArray)
 		if err != nil {
-			fmt.Println("ERROR : ", err)
 			response.Status = "query unsuccessful"
 			statusCode = http.StatusBadRequest
 			encoding.JsonEncode(w, response, statusCode)
@@ -430,7 +421,6 @@ func UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, err := strconv.Atoi(params["_id"])
-	fmt.Println("id : ", id)
 	if err != nil {
 		response.Status = "data updated unsuccessfully"
 		statusCode = http.StatusBadRequest
@@ -460,7 +450,6 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	statusCode := http.StatusOK
 
 	id, err := strconv.Atoi(params["_id"])
-	fmt.Println("id : ", id)
 	if err != nil {
 		response.Status = "data deleted unsuccessfully"
 		statusCode = http.StatusBadRequest
@@ -534,7 +523,6 @@ func FormsGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	resultArray, err := eng.SearchDocumentByPrefix("_form")
 	if err != nil {
-		fmt.Println("here")
 		response.Status = "schema fetched unsuccessfully"
 		statusCode = http.StatusBadRequest
 		encoding.JsonEncode(w, response, statusCode)
