@@ -1,4 +1,26 @@
 
+## Description
+-----
+### A working POC for Collateral Intelligence (backend).
+
+## Run Locally
+-----
+
+### Linux
+
+```1. chmod +x ./command.sh```
+
+```2. ./command.sh```
+
+## Current Deployment
+-----
+
+```
+Digital Ocean
+IP Address: 139.59.66.121
+
+```
+
 ## API Endpoints
 -----
 ```/form```  
@@ -284,16 +306,3 @@ Response:
         }
 ```
 
-
-## Steps
-----
-__Create a .env file in the same folder as this .zip is located__  
-Copy and paste this on .env file
-``` 
-http_target = localhost:3000
-config_path = /home/mandeep/work/src/krakend-gateway/config.json
-
-```
-Choose location where your config file is.
-
-__Run ./main__  
