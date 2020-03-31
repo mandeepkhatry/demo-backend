@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 
@@ -37,12 +36,13 @@ func init() {
 	config_path := "./gateway/config.json"
 	port = "3000"
 
+	extra := make(map[string]string)
+	extra["http_target"] = "localhost:3000"
+
 	viper.SetConfigFile(config_path)
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error reading config file, %s", err)
 	}
-	extra := make(map[string]string)
-	extra["http_target"] = os.Getenv("http_target")
 
 	epoints := viper.Get("endpoints").([]interface{})
 	if len(epoints) == 0 {
@@ -77,7 +77,7 @@ func main() {
 
 func BuildKrakendConfig(config map[string]interface{}) error {
 
-	http_target := os.Getenv("http_target")
+	http_target := "localhost:3000"
 	endpoints := viper.Get("endpoints").([]interface{})
 
 	extra_config := make(map[string]string)
