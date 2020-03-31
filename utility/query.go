@@ -13,11 +13,28 @@ func ConvertParamsToQuery(params map[string]string) string {
 
 	for k, v := range params {
 		eachParam := ""
-		if valid.IsAlpha(v) {
-			eachParam = k + "=" + "\"" + v + "\""
+		if valid.HasWhitespace(v) {
+			count := 0
+			words := strings.Split(v, " ")
+			for _, eachWord := range words {
+				if valid.IsAlpha(eachWord) {
+					count++
+				}
+			}
+			if count == len(words) {
+				eachParam = k + "=" + "\"" + v + "\""
+			} else {
+				eachParam = k + "=" + v
+			}
 		} else {
-			eachParam = k + "=" + v
+			if valid.IsAlpha(v) {
+				eachParam = k + "=" + "\"" + v + "\""
+			} else {
+				eachParam = k + "=" + v
+			}
+
 		}
+
 		queryParams = append(queryParams, eachParam)
 	}
 	return (query + strings.Join(queryParams, " AND "))

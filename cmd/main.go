@@ -8,6 +8,7 @@ import (
 	"demo-backend/server/kvstore"
 	"demo-backend/utility"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -314,9 +315,11 @@ func DataGetHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(parameters) != 0 {
+		fmt.Println("PARAMETERS : ", parameters)
 		parameters["table"] = params["table"]
 
 		query := utility.ConvertParamsToQuery(parameters)
+		fmt.Println("QUERY : ", query)
 
 		collection, postfixQuery, err := parser.ParseQuery(query)
 		if err != nil {
@@ -525,6 +528,7 @@ func FormsGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	resultArray, err := eng.SearchDocumentByPrefix("_form")
 	if err != nil {
+		fmt.Println("ERROR : ", err)
 		response.Status = "schema fetched unsuccessfully"
 		statusCode = http.StatusBadRequest
 		encoding.JsonEncode(w, response, statusCode)
